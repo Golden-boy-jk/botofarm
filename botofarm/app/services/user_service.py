@@ -1,51 +1,101 @@
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone, timedelta
+from typing import Sequence
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserLockResponse
 
 
-def create_user(db: Session, user_in: UserCreate) -> User:
-    """Создать нового пользователя в ботоферме."""
-    # проверяем уникальность логина
-    existing = db.query(User).filter(User.login == user_in.login).first()
-    if existing:
+async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
+    """
+    Создать нового пользователя в ботоферме.
+    Проверяем уникальность логина, хешируем пароль.
+    """
+    # проверка на дубликат логина
+    stmt = select(User).where(User.login == user_in.login)
+    result = await db.execute(stmt)
+    existing = result.scalar_one_or_none()
+
+    if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this login already exists.",
         )
 
-    db_user = User(
+    user = User(
+        # id генерируется в модели через default=uuid4()
+        created_at=datetime.now(timezone.utc),
         login=user_in.login,
         password=hash_password(user_in.password),
         project_id=user_in.project_id,
         env=user_in.env,
         domain=user_in.domain,
     )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
-def get_users(db: Session) -> List[User]:
-    """Получить всех пользователей ботофермы."""
-    return db.query(User).order_by(User.created_at.desc()).all()
-
-
-def acquire_lock(db: Session, user_id: UUID) -> UserLockResponse:
-    """Наложить блокировку на пользователя.
-
-    Если пользователь уже заблокирован (locktime не NULL),
-    вернуть ошибку 409.
+async def get_users(db: AsyncSession) -> Sequence[User]:
     """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
+    Получить список всех пользователей, отсортированных по дате создания.
+    """
+    stmt = select(User).order_by(User.created_at.desc())
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_free_user(db: AsyncSession) -> User:
+    """
+    Получить любого свободного (не залоченного) пользователя.
+    Если свободных нет — 404.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=settings.lock_timeout_seconds)
+
+    clear_stmt = (
+        update(User)
+        .where(User.locktime.is_not(None))
+        .where(User.locktime < cutoff)
+        .values(locktime=None)
+    )
+    await db.execute(clear_stmt)
+    await db.commit()
+
+    stmt = (
+        select(User)
+        .where(User.locktime.is_(None))
+        .order_by(User.created_at.asc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No free users available.",
+        )
+
+    return user
+
+async def acquire_lock(db: AsyncSession, user_id: UUID) -> UserLockResponse:
+    """
+    Наложить блокировку на пользователя.
+    Если пользователя нет → 404.
+    Если уже заблокирован → 409.
+    """
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found.",
@@ -57,10 +107,10 @@ def acquire_lock(db: Session, user_id: UUID) -> UserLockResponse:
             detail="User is already locked.",
         )
 
-    user.locktime = datetime.utcnow()
+    user.locktime = datetime.now(timezone.utc)
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     return UserLockResponse(
         id=user.id,
@@ -70,17 +120,24 @@ def acquire_lock(db: Session, user_id: UUID) -> UserLockResponse:
     )
 
 
-def release_lock(db: Session, user_id: UUID) -> UserLockResponse:
-    """Снять блокировку с пользователя (обнулить locktime)."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
+async def release_lock(db: AsyncSession, user_id: UUID) -> UserLockResponse:
+    """
+    Снять блокировку с пользователя.
+    Если пользователя нет → 404.
+    Если не был заблокирован → просто сообщаем об этом.
+    """
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found.",
         )
 
     if user.locktime is None:
-        # Не ошибка, но даём понятный ответ
+        # не считаем это ошибкой, просто возвращаем статус
         return UserLockResponse(
             id=user.id,
             locked=False,
@@ -90,8 +147,8 @@ def release_lock(db: Session, user_id: UUID) -> UserLockResponse:
 
     user.locktime = None
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
 
     return UserLockResponse(
         id=user.id,

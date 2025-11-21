@@ -3,12 +3,17 @@ from pydantic import PostgresDsn
 
 
 class Settings(BaseSettings):
-    app_name: str = "Botfarm Service"
-    debug: bool = True
-
     database_url: PostgresDsn
+    debug: bool = True
+    lock_timeout_seconds: int = 300 # 5 минут lock
 
-    # на будущее: сюда же можно добавить настройки auth, jwt и т.д.
+    @property
+    def async_database_url(self) -> str:
+        """
+        Генерирует async-URL (postgresql+asyncpg://....)
+        """
+        url = self.database_url.unicode_string()
+        return url.replace("postgresql+psycopg2", "postgresql+asyncpg")
 
     class Config:
         env_file = ".env"
@@ -16,3 +21,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

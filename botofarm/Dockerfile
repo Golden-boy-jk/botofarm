@@ -1,43 +1,49 @@
-# Dockerfile
-# Базовый образ Python (можешь потом поменять на 3.12)
+# -------------------------------
+#  Production-ready Dockerfile
+# -------------------------------
+
 FROM python:3.12-slim
 
-# Не интерактивный режим внутри контейнера
+# Общие переменные окружения
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Устанавливаем системные зависимости (для psycopg2 и т.п.)
+# Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем список зависимостей
+# Копируем requirements.txt отдельно (правильно для кэширования Docker)
 COPY requirements.txt .
+
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем приложение и alembic
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 
-# Копируем entrypoint-скрипт
+# Копируем entrypoint
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Копируем приложение
-COPY app ./app
-
-# Если есть файл .env, тоже можно скопировать (или использовать env_file в docker-compose)
-# COPY .env ./.env
-
-# Открываем порт для uvicorn
+# Порт внутри контейнера
 EXPOSE 8000
 
-# Запуск сервиса
-CMD ["./entrypoint.sh", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# -------------------------------
+# HEALTHCHECK — продовый
+# -------------------------------
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# -------------------------------
+# Запуск через entrypoint.sh
+# -------------------------------
+ENTRYPOINT ["./entrypoint.sh"]
+
