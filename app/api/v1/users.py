@@ -17,7 +17,9 @@ from app.services.user_service import (
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.post("/", response_model=UserRead, status_code=201)
+@router.post("/",
+             response_model=UserRead,
+             status_code=201)
 async def create_user_endpoint(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
@@ -26,7 +28,8 @@ async def create_user_endpoint(
     return await create_user(db=db, user_in=user_in)
 
 
-@router.get("/", response_model=List[UserRead])
+@router.get("/",
+            response_model=List[UserRead])
 async def get_users_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
@@ -34,7 +37,8 @@ async def get_users_endpoint(
     return await get_users_service(db=db)
 
 
-@router.get("/free", response_model=UserRead)
+@router.get("/free",
+            response_model=UserRead)
 async def get_free_user_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
@@ -42,7 +46,8 @@ async def get_free_user_endpoint(
     return await get_free_user_service(db=db)
 
 
-@router.post("/{user_id}/acquire", response_model=UserLockResponse)
+@router.post("/{user_id}/acquire",
+             response_model=UserLockResponse)
 async def acquire_lock_endpoint(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -51,7 +56,8 @@ async def acquire_lock_endpoint(
     return await acquire_lock_service(db=db, user_id=user_id)
 
 
-@router.post("/{user_id}/release", response_model=UserLockResponse)
+@router.post("/{user_id}/release",
+             response_model=UserLockResponse)
 async def release_lock_endpoint(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
