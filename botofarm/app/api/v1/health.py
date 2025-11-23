@@ -1,37 +1,37 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import engine
+from app.db.session import get_db
 
 router = APIRouter(tags=["health"])
 
 
-async def _check_db() -> dict:
+async def _check_db(db: AsyncSession) -> dict:
     """
     Проверка доступности БД.
-    Делаем простой SELECT 1 через async-connection.
+    Делаем простой SELECT 1 через текущую async-сессию.
     """
     try:
-        async with engine.connect() as conn:  # type: AsyncConnection
-            await conn.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         return {"status": "ok"}
     except Exception as exc:
-        # В логах ты всё равно увидишь traceback от uvicorn
+        # В логах всё равно будет traceback от uvicorn
         return {"status": "error", "error": str(exc)}
 
 
 @router.get("/health", summary="Healthcheck сервиса")
-async def healthcheck() -> dict:
+async def healthcheck(
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     """
     Продовый healthcheck:
     - проверка работы приложения
     - проверка доступности БД
     """
-    db_status = await _check_db()
-
+    db_status = await _check_db(db)
     overall_ok = db_status["status"] == "ok"
 
     if not overall_ok:

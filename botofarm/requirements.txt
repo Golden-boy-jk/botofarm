@@ -10,4 +10,5 @@ pytest
 httpx
 alembic
 asyncpg>=0.29
-
+aiosqlite
+pytest-asyncio
