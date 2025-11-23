@@ -5,7 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="65f54f43-88cc-42b3-b695-694c01b96077" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/botofarm/.github/ci.yml" beforeDir="false" afterPath="$PROJECT_DIR$/botofarm/.github/workflows/ci.yml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/botofarm/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,6 +49,11 @@
     "ignore.virus.scanning.warn.message": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Exia-JK\Desktop\botofarm\botofarm\.github\workflows" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
