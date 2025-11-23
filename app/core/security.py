@@ -1,4 +1,6 @@
 from passlib.context import CryptContext
+from datetime import datetime, timedelta, timezone
+
 
 # pwd_context = CryptContext(
 #     schemes=["bcrypt"],
@@ -34,7 +36,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
     """
     Создать JWT-токен.
-
     subject — обычно id пользователя (строкой) или его логин.
     """
     if expires_delta is None:
