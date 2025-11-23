@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import hash_password
 from app.models.user import User
+from app.core.security import verify_password
 from app.schemas.user import UserCreate, UserRead, UserLockResponse
 
 
@@ -156,3 +157,31 @@ async def release_lock(db: AsyncSession, user_id: UUID) -> UserLockResponse:
         locktime=None,
         message="User successfully unlocked.",
     )
+
+
+async def get_user_by_login(db: AsyncSession, login: str) -> User | None:
+    stmt = select(User).where(User.login == login)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def authenticate_user(db: AsyncSession, login: str, password: str) -> User | None:
+    """
+    Проверка логина и пароля:
+    - находим пользователя по логину
+    - сверяем пароль через verify_password
+    """
+    user = await get_user_by_login(db, login=login)
+    if user is None:
+        return None
+
+    if not verify_password(password, user.password):
+        return None
+
+    return user

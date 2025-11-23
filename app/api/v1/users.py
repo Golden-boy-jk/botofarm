@@ -1,6 +1,7 @@
 from typing import List
 from uuid import UUID
 
+from app.api.v1.auth import get_current_user
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,3 +65,14 @@ async def release_lock_endpoint(
 ):
     """Снять блокировку с пользователя (async)."""
     return await release_lock_service(db=db, user_id=user_id)
+
+
+@router.get("/me", response_model=UserRead)
+async def read_current_user(
+    current_user = Depends(get_current_user),
+):
+    """
+    Получить текущего пользователя по токену.
+    """
+    # current_user — это ORM-модель User, приведём к схеме UserRead
+    return UserRead.model_validate(current_user)
