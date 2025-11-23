@@ -46,3 +46,31 @@ async def healthcheck(
         "time": datetime.now(timezone.utc).isoformat(),
         "db": db_status,
     }
+
+@router.get("/health/live", summary="Liveness probe")
+async def liveness():
+    """
+    Liveness-проба показывает, что приложение работает.
+    Не проверяет БД, чтобы не убивать контейнер при сбоях БД.
+    """
+    return {"status": "alive"}
+
+
+@router.get("/health/ready", summary="Readiness probe")
+async def readiness(db: AsyncSession = Depends(get_db)):
+    """
+    Readiness-проба: приложение + БД.
+
+    Если БД недоступна → сервис считается неготовым принимать трафик.
+    """
+    db_status = await _check_db(db)
+    if db_status["status"] != "ok":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"db": db_status},
+        )
+
+    return {
+        "status": "ready",
+        "db": db_status,
+    }
