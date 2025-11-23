@@ -1,5 +1,5 @@
-# botofarm
 # 🤖 Botofarm Service
+![Botofarm CI](https://github.com/Golden-boy-jk/botofarm/actions/workflows/ci.yml/badge.svg)
 
 REST-сервис для управления тестовыми пользователями ботофермы.\
 Сервис предоставляет API для:
@@ -23,10 +23,10 @@ REST-сервис для управления тестовыми пользов�
 -   Async SQLAlchemy 2.0
 -   PostgreSQL 14+
 -   Alembic
--   Pytest
+-   Pytest + httpx + pytest-asyncio
 -   Docker / docker-compose
 -   OAuth2 (JWT)
--   Kubernetes (манифесты)
+-   Kubernetes манифесты (Minikube/KIND)
 
 ## 🚀 Запуск проекта
 
@@ -65,3 +65,39 @@ Swagger: http://localhost:8000/docs
   Pytest + coverage 75%+          ✔
   CI (GitHub Actions)             ✔
   Kubernetes манифесты            ✔
+
+🗂 Структура проекта
+app/
+  api/
+    v1/
+      users.py         # CRUD эндпоинты
+      auth.py          # /token, get_current_user
+      health.py        # liveness, readiness
+  core/
+    config.py          # настройки (env)
+    security.py        # пароли + JWT
+  db/
+    base.py            # DeclarativeBase
+    session.py         # async engine + session
+  models/
+    user.py            # модель User
+  schemas/
+    user.py            # Pydantic схемы
+    token.py           # схема токена
+  services/
+    user_service.py    # бизнес-логика
+  main.py              # FastAPI приложение
+alembic/
+  versions/
+docker-compose.yml
+Dockerfile
+entrypoint.sh
+k8s/botofarm.yaml      # Kubernetes манифесты
+tests/                 # тесты
+README.md
+
+
+🏁 Лицензия
+
+MIT.
+Используйте, улучшайте, масштабируйте 😊
