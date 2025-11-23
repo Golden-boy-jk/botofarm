@@ -23,8 +23,7 @@ async def create_user_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Создать нового пользователя в ботоферме (async)."""
-    user = await create_user(db=db, user_in=user_in)
-    return user
+    return await create_user(db=db, user_in=user_in)
 
 
 @router.get("/", response_model=List[UserRead])
@@ -32,8 +31,7 @@ async def get_users_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Получить список всех пользователей (async)."""
-    users = await get_users_service(db=db)
-    return users
+    return await get_users_service(db=db)
 
 
 @router.get("/free", response_model=UserRead)
@@ -41,8 +39,7 @@ async def get_free_user_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Получить любого свободного (не залоченного) пользователя."""
-    user = await get_free_user_service(db=db)
-    return user
+    return await get_free_user_service(db=db)
 
 
 @router.post("/{user_id}/acquire", response_model=UserLockResponse)
