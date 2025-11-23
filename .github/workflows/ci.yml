@@ -10,6 +10,25 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: botfarm
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/botfarm
+      DEBUG: "False"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,8 +45,7 @@ jobs:
           pip install pytest pytest-asyncio httpx aiosqlite
 
       - name: Run tests
-        run: |
-          pytest -q
+        run: pytest -q
 
 
   docker-build:
