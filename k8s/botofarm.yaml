@@ -1,0 +1,163 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: botofarm
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: botofarm-postgres-secret
+  namespace: botofarm
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: postgres
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: botofarm-config
+  namespace: botofarm
+data:
+  POSTGRES_DB: botfarm
+  POSTGRES_USER: postgres
+  POSTGRES_HOST: botofarm-postgres
+  POSTGRES_PORT: "5432"
+  # важное: строка подключения для Settings.database_url
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@botofarm-postgres:5432/botfarm
+  # если в settings есть lock_timeout_seconds — подстрой при желании
+  LOCK_TIMEOUT_SECONDS: "600"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: botofarm-postgres-pvc
+  namespace: botofarm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: botofarm-postgres
+  namespace: botofarm
+spec:
+  serviceName: botofarm-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: botofarm-postgres
+  template:
+    metadata:
+      labels:
+        app: botofarm-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: botofarm-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: botofarm-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: botofarm-postgres-secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: botofarm-postgres
+  namespace: botofarm
+spec:
+  selector:
+    app: botofarm-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: botofarm-web
+  namespace: botofarm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: botofarm-web
+  template:
+    metadata:
+      labels:
+        app: botofarm-web
+    spec:
+      containers:
+        - name: botofarm-web
+          # !!! ЗАМЕНИ образ на свой, если пушишь в registry
+          image: botofarm-web:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: botofarm-config
+            - secretRef:
+                name: botofarm-postgres-secret
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: botofarm-web
+  namespace: botofarm
+spec:
+  selector:
+    app: botofarm-web
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  type: NodePort
