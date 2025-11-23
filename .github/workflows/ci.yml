@@ -2,28 +2,13 @@ name: Botofarm CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: botfarm
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
       - name: Checkout repository
@@ -41,10 +26,9 @@ jobs:
           pip install pytest pytest-asyncio httpx aiosqlite
 
       - name: Run tests
-        env:
-          DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/botfarm
         run: |
           pytest -q
+
 
   docker-build:
     runs-on: ubuntu-latest
