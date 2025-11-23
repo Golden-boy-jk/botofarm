@@ -1,70 +1,28 @@
-name: Botofarm CI
+import uuid
+import pytest
+from httpx import AsyncClient
 
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
+@pytest.mark.asyncio
+async def test_get_free_user(client: AsyncClient):
+    # создаём пользователя, который точно свободен
+    payload = {
+        "login": f"free_{uuid.uuid4().hex[:6]}@example.com",
+        "password": "secret123",
+        "project_id": str(uuid.uuid4()),
+        "env": "prod",
+        "domain": "regular",
+    }
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: botfarm
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
+    # создаём юзера
+    resp_create = await client.post("/api/v1/users/", json=payload)
+    assert resp_create.status_code == 201
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    # получаем свободного юзера
+    resp_free = await client.get("/api/v1/users/free")
+    assert resp_free.status_code == 200
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+    data = resp_free.json()
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx aiosqlite
-
-      - name: Run tests
-        env:
-          DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/botfarm
-        run: |
-          pytest -q
-
-  docker-build:
-    runs-on: ubuntu-latest
-    needs: test
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+    # сравниваем логины
+    assert data["login"] == payload["login"]
