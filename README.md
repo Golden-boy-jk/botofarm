@@ -67,7 +67,7 @@ Swagger: http://localhost:8000/docs
   Kubernetes манифесты            ✔
 
 🗂 Структура проекта
-app/
+```app/
   api/
     v1/
       users.py         # CRUD эндпоинты
@@ -95,7 +95,7 @@ entrypoint.sh
 k8s/botofarm.yaml      # Kubernetes манифесты
 tests/                 # тесты
 README.md
-
+```
 
 🏁 Лицензия
 
